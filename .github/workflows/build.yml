@@ -30,14 +30,25 @@ jobs:
           [ -f ../patches/apply.sh ] && bash ../patches/apply.sh
           git diff --stat
 
+      - name: Compiler check
+        shell: bash
+        run: |
+          T="$PWD/clang/bin"
+          export PATH="$PATH:$T"
+          $T/clang --version | head -2
+          echo 'int main(void){return 0;}' > /tmp/t.c
+          $T/clang --target=aarch64-linux-gnu -fstack-protector-strong -c /tmp/t.c -o /tmp/t.o && echo "stack-protector OK" || echo "stack-protector FAILED"
+          which aarch64-linux-gnu-as aarch64-linux-gnu-ld || true
+
       - name: Build
         shell: bash
         env:
           DEFCONFIG: ${{ inputs.defconfig }}
         run: |
           T="$PWD/clang/bin"
+          export PATH="$PATH:$T"
           cd k
-          MK="make O=out ARCH=arm64 CC=$T/clang LD=$T/ld.lld AR=$T/llvm-ar NM=$T/llvm-nm OBJCOPY=$T/llvm-objcopy OBJDUMP=$T/llvm-objdump STRIP=$T/llvm-strip CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=$T/aarch64-linux-gnu- CROSS_COMPILE_ARM32=$T/arm-linux-gnueabi- HOSTCC=gcc HOSTCXX=g++ HOSTLD=/usr/bin/ld KCFLAGS=-Wno-error"
+          MK="make O=out ARCH=arm64 CC=$T/clang LD=$T/ld.lld AR=$T/llvm-ar NM=$T/llvm-nm OBJCOPY=$T/llvm-objcopy OBJDUMP=$T/llvm-objdump STRIP=$T/llvm-strip CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- HOSTCC=gcc HOSTCXX=g++ HOSTLD=/usr/bin/ld KCFLAGS=-Wno-error"
           $MK "$DEFCONFIG"
           $MK -j"$(nproc)" 2>&1 | tee ../build.log
 
