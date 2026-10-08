@@ -1,0 +1,18 @@
+name: recon4
+on: workflow_dispatch
+jobs:
+  recon4:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone kernel
+        run: git clone --depth 1 -b dandelion-q-oss https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git k
+      - name: CPU level code
+        run: |
+          cd k/drivers/misc/mediatek/base/power/cpufreq_v1/src
+          ls
+          grep -rn -E "CPU_LEVEL_[0-9]" --include=*.c --include=*.h . | grep -v "opp_table.h" | head -40
+          grep -rn -E "get_devinfo_with_index|cpu_dvfs_get_level|get_cpu_level|segment" --include=*.c . | head -40
+      - name: Level map
+        run: |
+          cd k/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765
+          sed -n 1660,1712p mtk_cpufreq_opp_table.h
