@@ -1,6 +1,6 @@
 #!/bin/bash
-# Run inside kernel root (k/). Fill after recon output:
-#  - panel: raise refresh 60 -> 70 Hz in drivers/misc/mediatek/lcm/.../icnl9911c*.c
-#  - GPU: add/enable 680000 kHz OPP in gpufreq table
-#  - CPU (optional): 2000000 -> 2300000 if table allows
-echo "no patches yet"
+set -e
+F=drivers/misc/mediatek/base/power/mt6765/mtk_gpufreq_core.c
+grep -n "g_segment_id = MT6762_SEGMENT;" $F
+sed -i 's/g_segment_id = MT6762_SEGMENT;/g_segment_id = MT6765_SEGMENT;/' $F
+echo "GPU patched: 650 -> 680 MHz"
