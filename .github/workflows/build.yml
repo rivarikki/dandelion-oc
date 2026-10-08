@@ -50,7 +50,7 @@ jobs:
           cd k
           MK=(make O=out ARCH=arm64
             "CC=$T/clang -fuse-ld=lld -Wno-unknown-warning-option -Wno-unused-command-line-argument"
-            "LD=$T/ld.lld" "AR=$T/llvm-ar" "NM=$T/llvm-nm" "OBJCOPY=$T/llvm-objcopy"
+            "LD=$T/aarch64-linux-gnu-ld" "AR=$T/llvm-ar" "NM=$T/llvm-nm" "OBJCOPY=$T/llvm-objcopy"
             "OBJDUMP=$T/llvm-objdump" "STRIP=$T/llvm-strip"
             CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu-
             CROSS_COMPILE_ARM32=arm-linux-gnueabi-
