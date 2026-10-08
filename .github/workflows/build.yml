@@ -24,11 +24,13 @@ jobs:
       - name: Toolchain
         run: git clone --depth 1 https://github.com/kdrag0n/proton-clang.git clang
 
-      - name: Fix assembler
+      - name: Fix assembler and linker
         run: |
           cd clang/bin
           ln -sf aarch64-linux-gnu-as as
+          ln -sf aarch64-linux-gnu-ld ld
           ./as --version | head -1
+          ./ld --version | head -1
 
       - name: Apply patches
         working-directory: k
@@ -47,7 +49,7 @@ jobs:
           export PATH="$PATH:$T"
           cd k
           MK=(make O=out ARCH=arm64
-            "CC=$T/clang -Wno-unknown-warning-option -Wno-unused-command-line-argument"
+            "CC=$T/clang -fuse-ld=lld -Wno-unknown-warning-option -Wno-unused-command-line-argument"
             "LD=$T/ld.lld" "AR=$T/llvm-ar" "NM=$T/llvm-nm" "OBJCOPY=$T/llvm-objcopy"
             "OBJDUMP=$T/llvm-objdump" "STRIP=$T/llvm-strip"
             CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu-
