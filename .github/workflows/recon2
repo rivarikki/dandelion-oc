@@ -1,0 +1,29 @@
+name: recon2
+on: workflow_dispatch
+jobs:
+  recon2:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone kernel
+        run: git clone --depth 1 -b dandelion-q-oss https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git k
+      - name: LCM list
+        run: |
+          cd k
+          ls drivers/misc/mediatek/lcm | head -60
+          grep -n "LCM" arch/arm64/configs/dandelion_defconfig | head -20
+          grep -n -i -E "9911|icnl" drivers/misc/mediatek/lcm/mt65xx_lcm_list.c | head -20
+      - name: Any 9911 file
+        run: cd k && grep -rli "9911" --include=*.c --include=*.h --include=*.dts* --include=Makefile --include=*defconfig . | head -20
+      - name: GPUFREQ files
+        run: |
+          cd k
+          find . -iname "*gpufreq*" | head -20
+          find . -type d -name "gpu*" | head -20
+      - name: GPU OPP numbers
+        run: |
+          cd k
+          grep -rn -E "GPU_DVFS_FREQ|g_opp_table|650000|680000" drivers/misc/mediatek --include=*.c --include=*.h | head -30
+      - name: dts
+        run: cd k && ls arch/arm64/boot/dts/mediatek | grep -i -E "dandelion|k62|6762|6765"
+      - name: CPU table
+        run: cd k && sed -n 440,460p drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_table.h
