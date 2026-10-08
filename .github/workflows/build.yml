@@ -55,10 +55,16 @@ jobs:
         run: |
           T="$PWD/clang/bin"
           export PATH="$PATH:$T"
+          echo "--- external assembler test"
+          echo 'int main(void){return 0;}' > /tmp/t.c
+          $T/clang -no-integrated-as --target=aarch64-linux-gnu --prefix=$T/ --gcc-toolchain=$PWD/clang -fstack-protector-strong -c /tmp/t.c -o /tmp/t.o 2>&1 | head -10 || true
+          $T/aarch64-linux-gnu-as --version 2>&1 | head -2 || true
+          echo "--- full kernel flags test"
           cd k
-          make O=out ARCH=arm64 "CC=$T/clang" CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- HOSTCC=gcc HOSTLD=/usr/bin/ld -pn prepare-compiler-check 2>/dev/null | grep -E '^(GCC_TOOLCHAIN|GCC_TOOLCHAIN_DIR|CLANG_FLAGS|CLANG_TARGET|CLANG_PREFIX|CLANG_GCC_TC) ' | head -10
-          which aarch64-linux-gnu-elfedit || echo "elfedit NOT FOUND"
-          $T/clang -Werror --target=aarch64-linux-gnu -fstack-protector-strong -c -x c /dev/null -o /dev/null && echo "bare -Werror test OK" || echo "bare -Werror test FAILED"
+          FL=$(make O=out ARCH=arm64 CC=$T/clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- HOSTCC=gcc HOSTLD=/usr/bin/ld -pn prepare-compiler-check 2>/dev/null | grep -E '^KBUILD_CFLAGS :=' | head -1 | sed 's/^KBUILD_CFLAGS := //')
+          echo "$FL" | cut -c1-1200
+          eval "$T/clang $FL -fstack-protector-strong -c -x c /dev/null -o /dev/null" 2>&1 | head -20 || true
+          echo "--- done"
 
       - name: Magiskboot
         run: |
