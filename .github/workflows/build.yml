@@ -7,14 +7,16 @@ on:
         default: dandelion_defconfig
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
       - name: Deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison flex libssl-dev libelf-dev python3 cpio zip unzip device-tree-compiler
+          sudo apt-get install -y bc bison flex libssl-dev libelf-dev python3 python2 cpio zip unzip device-tree-compiler
+          sudo ln -sf /usr/bin/python2 /usr/bin/python
+          python --version
 
       - name: Clone kernel
         run: git clone --depth 1 -b dandelion-q-oss https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git k
@@ -25,7 +27,6 @@ jobs:
       - name: Fix assembler
         run: |
           cd clang/bin
-          file as | head -1
           ln -sf aarch64-linux-gnu-as as
           ./as --version | head -1
 
@@ -60,7 +61,9 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          tail -40 build.log || true
+          grep -n -E "error|Error|undefined" build.log | head -30 || true
+          echo "--- tail"
+          tail -30 build.log || true
 
       - name: Magiskboot
         run: |
