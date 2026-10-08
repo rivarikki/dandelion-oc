@@ -1,0 +1,31 @@
+name: recon3
+on: workflow_dispatch
+jobs:
+  recon3:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone kernel
+        run: git clone --depth 1 -b dandelion-q-oss https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git k
+      - name: GPU defines
+        run: |
+          cd k/drivers/misc/mediatek/base/power/mt6765
+          grep -n -E "SEG[1-5]_GPU_DVFS_(FREQ|VOLT|VSRAM)[0-9]" mtk_gpufreq_core.h
+      - name: GPU segment pick
+        run: |
+          cd k/drivers/misc/mediatek/base/power/mt6765
+          grep -n -i -E "segment|efuse|g_opp_table = |g_opp_table_default =" mtk_gpufreq_core.c | head -60
+      - name: CPU freq per segment
+        run: |
+          cd k/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765
+          grep -n -E "FREQ0_L_|FREQ0_LL_|2300000|2200000" mtk_cpufreq_opp_table.h | head -40
+      - name: CPU segment pick
+        run: |
+          cd k/drivers/misc/mediatek/base/power/cpufreq_v1/src
+          grep -rn -E "C62LY|C65|segment|efuse" mach/mt6765/ mtk_cpufreq_*.c 2>/dev/null | grep -v "define CPU_DVFS" | head -50
+      - name: LCM dir
+        run: |
+          cd k
+          ls drivers/misc/mediatek/lcm | head -80
+          grep -n -i "LCM" arch/arm64/configs/dandelion_defconfig | head -20
+          grep -rl "lcm_setbacklight_cmdq" drivers --include=*.c | head
+          grep -rli "icnl9911" drivers arch --include=*.c --include=*.h --include=*.dts* | head
