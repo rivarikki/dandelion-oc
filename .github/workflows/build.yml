@@ -22,6 +22,13 @@ jobs:
       - name: Toolchain
         run: git clone --depth 1 https://github.com/kdrag0n/proton-clang.git clang
 
+      - name: Fix assembler
+        run: |
+          cd clang/bin
+          file as | head -1
+          ln -sf aarch64-linux-gnu-as as
+          ./as --version | head -1
+
       - name: Apply patches
         working-directory: k
         run: |
@@ -53,18 +60,7 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          T="$PWD/clang/bin"
-          export PATH="$PATH:$T"
-          echo "--- external assembler test"
-          echo 'int main(void){return 0;}' > /tmp/t.c
-          $T/clang -no-integrated-as --target=aarch64-linux-gnu --prefix=$T/ --gcc-toolchain=$PWD/clang -fstack-protector-strong -c /tmp/t.c -o /tmp/t.o 2>&1 | head -10 || true
-          $T/aarch64-linux-gnu-as --version 2>&1 | head -2 || true
-          echo "--- full kernel flags test"
-          cd k
-          FL=$(make O=out ARCH=arm64 CC=$T/clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- HOSTCC=gcc HOSTLD=/usr/bin/ld -pn prepare-compiler-check 2>/dev/null | grep -E '^KBUILD_CFLAGS :=' | head -1 | sed 's/^KBUILD_CFLAGS := //')
-          echo "$FL" | cut -c1-1200
-          eval "$T/clang $FL -fstack-protector-strong -c -x c /dev/null -o /dev/null" 2>&1 | head -20 || true
-          echo "--- done"
+          tail -40 build.log || true
 
       - name: Magiskboot
         run: |
