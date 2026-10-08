@@ -3,47 +3,55 @@ on:
   workflow_dispatch:
     inputs:
       defconfig:
-        description: defconfig name (from recon output)
+        description: defconfig name
         default: dandelion_defconfig
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison flex libssl-dev libelf-dev python3 cpio zip device-tree-compiler
+          sudo apt-get install -y bc bison flex libssl-dev libelf-dev python3 cpio zip unzip device-tree-compiler
+
       - name: Clone kernel
         run: git clone --depth 1 -b dandelion-q-oss https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git k
+
       - name: Toolchain
         run: git clone --depth 1 https://github.com/kdrag0n/proton-clang.git clang
+
       - name: Apply patches
         working-directory: k
         run: |
           set -e
           for p in ../patches/*.patch; do [ -f "$p" ] && git apply --verbose "$p"; done || true
-          [ -f ../patches/apply.sh ] && bash ../patches/apply.sh || true
+          [ -f ../patches/apply.sh ] && bash ../patches/apply.sh
           git diff --stat
+
       - name: Build
+        shell: bash
         env:
           DEFCONFIG: ${{ inputs.defconfig }}
         run: |
-          export PATH="$PWD/clang/bin:$PATH"
+          T="$PWD/clang/bin"
           cd k
-          make O=out ARCH=arm64 "$DEFCONFIG"
-          make -j"$(nproc)" O=out ARCH=arm64 CC=clang LD=ld.lld \
-            CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS=-Wno-error 2>&1 | tee ../build.log
+          MK="make O=out ARCH=arm64 CC=$T/clang LD=$T/ld.lld AR=$T/llvm-ar NM=$T/llvm-nm OBJCOPY=$T/llvm-objcopy OBJDUMP=$T/llvm-objdump STRIP=$T/llvm-strip CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=$T/aarch64-linux-gnu- CROSS_COMPILE_ARM32=$T/arm-linux-gnueabi- HOSTCC=gcc HOSTCXX=g++ HOSTLD=/usr/bin/ld KCFLAGS=-Wno-error"
+          $MK "$DEFCONFIG"
+          $MK -j"$(nproc)" 2>&1 | tee ../build.log
+
       - name: Magiskboot
         run: |
           curl -sL -o magisk.apk https://github.com/topjohnwu/Magisk/releases/download/v27.0/Magisk-v27.0.apk
           unzip -j magisk.apk lib/x86_64/libmagiskboot.so -d mb
           mv mb/libmagiskboot.so magiskboot && chmod +x magiskboot
+
       - name: Repack boot
         run: |
-          [ -f stock/boot.img ] || { echo "stock/boot.img missing"; exit 1; }
-          mkdir r && cp stock/boot.img r/ && cd r
+          [ -f stock/boot.img ] || { [ -f stock/boot.zip ] && unzip -o stock/boot.zip -d stock; }
+          [ -f stock/boot.img ] || { echo "stock/boot.img or stock/boot.zip missing"; exit 1; }
+          mkdir r && cp stock/boot.img r/boot.img && cd r
           ../magiskboot unpack boot.img
           ls -la
           B=../k/out/arch/arm64/boot
@@ -54,6 +62,7 @@ jobs:
             cat $B/Image $(ls $B/dts/mediatek/*.dtb | head -1) > kernel
           fi
           ../magiskboot repack boot.img ../boot_new.img
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
