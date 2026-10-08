@@ -1,0 +1,63 @@
+name: build-kernel
+on:
+  workflow_dispatch:
+    inputs:
+      defconfig:
+        description: defconfig name (from recon output)
+        default: dandelion_defconfig
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex libssl-dev libelf-dev python3 cpio zip device-tree-compiler
+      - name: Clone kernel
+        run: git clone --depth 1 -b dandelion-q-oss https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git k
+      - name: Toolchain
+        run: git clone --depth 1 https://github.com/kdrag0n/proton-clang.git clang
+      - name: Apply patches
+        working-directory: k
+        run: |
+          set -e
+          for p in ../patches/*.patch; do [ -f "$p" ] && git apply --verbose "$p"; done || true
+          [ -f ../patches/apply.sh ] && bash ../patches/apply.sh || true
+          git diff --stat
+      - name: Build
+        env:
+          DEFCONFIG: ${{ inputs.defconfig }}
+        run: |
+          export PATH="$PWD/clang/bin:$PATH"
+          cd k
+          make O=out ARCH=arm64 "$DEFCONFIG"
+          make -j"$(nproc)" O=out ARCH=arm64 CC=clang LD=ld.lld \
+            CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- KCFLAGS=-Wno-error 2>&1 | tee ../build.log
+      - name: Magiskboot
+        run: |
+          curl -sL -o magisk.apk https://github.com/topjohnwu/Magisk/releases/download/v27.0/Magisk-v27.0.apk
+          unzip -j magisk.apk lib/x86_64/libmagiskboot.so -d mb
+          mv mb/libmagiskboot.so magiskboot && chmod +x magiskboot
+      - name: Repack boot
+        run: |
+          [ -f stock/boot.img ] || { echo "stock/boot.img missing"; exit 1; }
+          mkdir r && cp stock/boot.img r/ && cd r
+          ../magiskboot unpack boot.img
+          ls -la
+          B=../k/out/arch/arm64/boot
+          if [ -f dtb ]; then
+            cp $B/Image kernel
+          else
+            echo "WARNING: no separate dtb in stock boot, appending built dtbs"
+            cat $B/Image $(ls $B/dts/mediatek/*.dtb | head -1) > kernel
+          fi
+          ../magiskboot repack boot.img ../boot_new.img
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kernel-out
+          path: |
+            boot_new.img
+            build.log
