@@ -1,0 +1,21 @@
+name: recon6
+on: workflow_dispatch
+jobs:
+  recon6:
+    runs-on: ubuntu-latest
+    steps:
+      - run: git clone --depth 1 -b dandelion-q-oss https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git k
+      - name: Touch fw includes
+        run: |
+          cd k/drivers/input/touchscreen/mediatek/ft8006s_spi
+          ls
+          sed -n 40,120p focaltech_flash.c
+      - name: Upgrade switches
+        run: |
+          cd k/drivers/input/touchscreen/mediatek/ft8006s_spi
+          grep -rn -E "AUTO_UPGRADE|FTS_UPGRADE|FW_INCLUDE|fw_helitai|FTS_GET_VENDOR|fts_upgrade_arry" . | head -40
+      - name: Firmware dir
+        run: |
+          cd k
+          ls include/firmware 2>&1 | head -20
+          grep -n -i -E "FTS|FT8006|TOUCH" arch/arm64/configs/dandelion_defconfig | head -20
