@@ -30,16 +30,6 @@ jobs:
           [ -f ../patches/apply.sh ] && bash ../patches/apply.sh
           git diff --stat
 
-      - name: Compiler check
-        shell: bash
-        run: |
-          T="$PWD/clang/bin"
-          export PATH="$PATH:$T"
-          $T/clang --version | head -2
-          echo 'int main(void){return 0;}' > /tmp/t.c
-          $T/clang --target=aarch64-linux-gnu -fstack-protector-strong -c /tmp/t.c -o /tmp/t.o && echo "stack-protector OK" || echo "stack-protector FAILED"
-          which aarch64-linux-gnu-as aarch64-linux-gnu-ld || true
-
       - name: Build
         shell: bash
         env:
@@ -48,9 +38,27 @@ jobs:
           T="$PWD/clang/bin"
           export PATH="$PATH:$T"
           cd k
-          MK="make O=out ARCH=arm64 CC=$T/clang LD=$T/ld.lld AR=$T/llvm-ar NM=$T/llvm-nm OBJCOPY=$T/llvm-objcopy OBJDUMP=$T/llvm-objdump STRIP=$T/llvm-strip CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- HOSTCC=gcc HOSTCXX=g++ HOSTLD=/usr/bin/ld KCFLAGS=-Wno-error"
-          $MK "$DEFCONFIG"
-          $MK -j"$(nproc)" 2>&1 | tee ../build.log
+          MK=(make O=out ARCH=arm64
+            "CC=$T/clang -Wno-unknown-warning-option -Wno-unused-command-line-argument"
+            "LD=$T/ld.lld" "AR=$T/llvm-ar" "NM=$T/llvm-nm" "OBJCOPY=$T/llvm-objcopy"
+            "OBJDUMP=$T/llvm-objdump" "STRIP=$T/llvm-strip"
+            CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu-
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+            HOSTCC=gcc HOSTCXX=g++ HOSTLD=/usr/bin/ld
+            KCFLAGS=-Wno-error)
+          "${MK[@]}" "$DEFCONFIG"
+          "${MK[@]}" -j"$(nproc)" 2>&1 | tee ../build.log
+
+      - name: Diagnose
+        if: failure()
+        shell: bash
+        run: |
+          T="$PWD/clang/bin"
+          export PATH="$PATH:$T"
+          cd k
+          make O=out ARCH=arm64 "CC=$T/clang" CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- HOSTCC=gcc HOSTLD=/usr/bin/ld -pn prepare-compiler-check 2>/dev/null | grep -E '^(GCC_TOOLCHAIN|GCC_TOOLCHAIN_DIR|CLANG_FLAGS|CLANG_TARGET|CLANG_PREFIX|CLANG_GCC_TC) ' | head -10
+          which aarch64-linux-gnu-elfedit || echo "elfedit NOT FOUND"
+          $T/clang -Werror --target=aarch64-linux-gnu -fstack-protector-strong -c -x c /dev/null -o /dev/null && echo "bare -Werror test OK" || echo "bare -Werror test FAILED"
 
       - name: Magiskboot
         run: |
